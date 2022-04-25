@@ -1,39 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UpdateCourseDto } from './dto/update-course.dto';
 import { Course } from './entities/course.entity';
 
 @Injectable()
 export class CoursesService {
-  private courses: Course[] = [
-    {
-      id: 1,
-      name: 'Curso NestJs',
-      description: 'Curso NestJs',
-      tags: [ 'javascript', 'nestjs' ]
-    },
-  ];
+  constructor(
+    @InjectRepository(Course)
+    private readonly courseRepository: Repository<Course>
+  ) {}
 
   findAll() {
-    return this.courses;
+    return this.courseRepository.find();
   }
 
-  findOne(id: string) {
-    return this.courses.find((course: Course) => course.id === Number(id))
+  findOne(id) {
+    const course =  this.courseRepository.findOne(id);
+
+    if (!course) {
+      throw new NotFoundException(`Course id ${id} not found`)
+    }
+
+    return course;
   }
 
   create(createCourseDto: any) {
-    this.courses.push(createCourseDto);
+    const course = this.courseRepository.create(createCourseDto);
+    return this.courseRepository.save(course);
   }
 
-  update(id: string, updateCourseDto: any) {
-    const indexCourse = this.courses.findIndex(course => course.id === Number(id));
-    this.courses[indexCourse] = updateCourseDto;
-  }
+  async update(id: string, updateCourseDto: UpdateCourseDto) {
+    const course = await this.courseRepository.preload({
+      id: Number(id),
+      ...updateCourseDto
+    });
 
-  remove(id: string) {
-    const indexCourse = this.courses.findIndex(course => course.id === Number(id));
-
-    if (indexCourse >= 0) {
-      this.courses.splice(indexCourse, 1)
+    if (!course) {
+      throw new NotFoundException(`Course id ${id} not found`)
     }
+
+    return this.courseRepository.save(course);
+  }
+
+  async remove(id) {
+    const course = await this.courseRepository.findOne(id);
+
+    if (!course) {
+      throw new NotFoundException(`Course id ${id} not found`)
+    }
+
+    return this.courseRepository.remove(course)
   }
 }
